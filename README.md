@@ -111,9 +111,13 @@ python studies/walk_forward.py     # the out-of-sample test
 pytest                             # 42 tests, no network
 ```
 
-Prices are cached as CSV under `data/cache/` on first download, so every study
-re-runs offline. The test suite never touches the network and never reads the
-cache: it runs on synthetic data with known properties.
+The first study you run downloads its prices from Yahoo Finance and caches them
+as CSV under `data/cache/`; every run after that is offline. The cache is not
+committed — Yahoo's terms do not allow redistributing their data.
+
+The test suite never touches the network and never reads the cache: it runs on
+synthetic data with known properties, so `pytest` works on a fresh clone with no
+downloads at all.
 
 ## Use it on your own backtest
 
