@@ -7,7 +7,6 @@ from .stats import (
     moments,
     probabilistic_sharpe_ratio,
     sharpe_ratio,
-    sharpe_variance_across_trials,
 )
 
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     "pbo",
     "probabilistic_sharpe_ratio",
     "sharpe_ratio",
-    "sharpe_variance_across_trials",
 ]

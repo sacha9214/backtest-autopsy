@@ -8,30 +8,36 @@ draws — and a maximum over fifty draws is large even when every variant is
 worthless. Run 1000 backtests of pure noise and the winner is *expected* to
 show a Sharpe ratio of **3.26**.
 
-This repository implements the standard corrections for that problem, and then
-uses them on the strategies people actually repeat.
+This repository implements the standard corrections for that, and then uses
+them on the strategies people actually repeat.
 
 ## The result
 
 Forty-four configurations that every trading blog recommends — moving-average
 crossovers, RSI oversold, time-series momentum, Bollinger reversion, Donchian
-breakouts — run across ten liquid US instruments, 22 to 46 years of adjusted
-daily data each, with transaction costs and a one-day execution lag.
+breakouts — across ten liquid US instruments, 22 to 46 years of adjusted daily
+data each, with transaction costs and a one-day execution lag. Then the same
+grid again in long/short form, so the results cannot simply be inheriting the
+market's rise.
 
-| Question | Answer |
-|---|---|
-| Beat buy and hold in-sample? | **9 / 10** |
-| Survive deflation for 44 trials? | **1 / 10** |
-| Beat buy and hold *out-of-sample*? | **1 / 10** |
-| Still the best choice out-of-sample? | **1 / 10** |
+| | Long-only | Long/short |
+|---|---|---|
+| Beat buy and hold in-sample | 9 / 10 | 3 / 10 |
+| Survive deflation for 44 trials | **1 / 10** | **0 / 10** |
+| Positive out-of-sample | 9 / 10 | 5 / 10 |
+| Beat buy and hold out-of-sample | **1 / 10** | **1 / 10** |
+| Median out-of-sample Sharpe | — | **−0.01** |
 
-The single out-of-sample winner is TLT — long-dated Treasuries, the only
-instrument in the set that did not rise over the test window (its own Sharpe
-was 0.06). On a flat asset, being occasionally out of the market helps. That is
-not a strategy, it is a description of the period.
+The long-only column has an obvious objection: on assets that rose for thirty
+years, "sometimes long" is nearly "always long". The long/short column removes
+that objection and the answer gets worse, not better. Stripped of the market's
+beta, these recipes produce a median out-of-sample Sharpe of **−0.01**.
 
-XLK survived deflation (DSR 0.964) and still lost to simply holding it: 0.89
-against 0.99.
+The single out-of-sample winner in both studies is TLT — long-dated Treasuries,
+the only instrument in the set that did not rise over the test window (its own
+Sharpe was 0.06). On a flat asset, being occasionally out of the market helps.
+Its DSR is 0.556, so it does not clear the bar either: it beats a weak
+benchmark, not chance.
 
 ```
   SPY 1993-2026, 44 retail recipes
@@ -62,21 +68,21 @@ It would take 121.
 Sources: Bailey & López de Prado (2012, 2014); Bailey, Borwein, López de Prado
 & Zhu (2015).
 
-## Two findings about the tools themselves
+## Three findings about the tools themselves
 
-Both were measured here, not assumed, and both cut against how these metrics
-are usually presented.
+All three were measured here rather than assumed, and all three cut against how
+these metrics are usually presented or implemented.
 
-**1. A single PBO value proves very little.** On pure noise, PBO averages 0.50
-as advertised — but with a standard deviation near **0.2**. Individual runs of
-strategies with no skill whatsoever came back anywhere from 0.01 to 0.96. PBO
-is decisive in one direction only: a genuine edge pins it at 0.000 with zero
+**1. A single PBO value proves very little.** On pure noise PBO averages 0.50 as
+advertised — with a standard deviation near **0.2**. Individual runs of
+strategies with no skill whatsoever came back anywhere from 0.01 to 0.96. It is
+decisive in one direction only: a genuine edge pins it at 0.000 with zero
 variance. A mid-range value is not evidence of overfitting.
 
 **2. The in-sample-to-out-of-sample slope is mechanical, and its intuitive
 reading is backwards.** CSCV splits are complementary, so `mean(IS) + mean(OOS)`
-is pinned to twice the full-sample mean, which forces a negative slope. Measured
-on 44 strategies over 2000 periods:
+is pinned to twice the full-sample mean (verified to 1e-18), forcing a negative
+slope. Measured on 44 strategies over 2000 periods:
 
 | | Slope |
 |---|---|
@@ -84,16 +90,50 @@ on 44 strategies over 2000 periods:
 | One genuine edge | **−1.00 ± 0.00** |
 
 A slope near −1 indicates a *dominant* strategy — the opposite of "degradation".
-The metric is exposed in the API with this warning attached and deliberately
-kept out of the rendered verdict.
+The metric is kept in the API with this warning attached and out of the verdict.
+
+**3. `V[SR] = 1` is a trap, and this repository fell into it.** The familiar
+default comes from the paper, where it suits *annualized* Sharpe ratios. Applied
+to per-period ratios it is catastrophic: a real daily search here produced an
+across-trial variance of **3.4e-4**, so the default is roughly 3000× too large
+and rejects everything — silently, and with an air of rigour. An early version
+of the retrospective below "caught" three out of three false positives that way,
+which proved nothing at all. `sharpe_variance` is now a required argument with
+no default, and `sharpe_variance_across_trials` estimates it from your own
+trials. There is a regression test for it.
+
+## Turning the tool on its author
+
+Before any of this existed I spent three weeks looking for an edge on Polymarket
+sports markets and produced results that looked real and were not.
+`studies/polymarket_retrospective.py` feeds them back through the corrections
+using only what was known at the time. Since the across-trial variance was never
+recorded, it solves for the value at which each verdict would flip instead of
+inventing one:
+
+| Claim | Textbook verdict | DSR | Flips at |
+|---|---|---|---|
+| Price zone 0.50-0.75: +7.61%, t = 2.41 | **significant** (PSR 0.992) | 0.919 rejected | 0.57× reference — *close* |
+| Pair assembly: +3.05% | not significant | 0.818 rejected | never |
+| Ladderbot residual: +6.9% | not significant | 0.247 rejected | never |
+
+The first is the interesting one, in both directions. Every standard test said
+yes — t of 2.41, PSR above 0.99 — and out-of-sample it delivered +0.06% (t =
+0.03) on 1404 fresh observations. What killed it was counting the eight
+strategies tried before it. But the rejection is close to the flip point, so it
+depends on a parameter that was never written down: had the search been less
+dispersed, the correction would have let it through. Counting your trials is not
+optional, and the count cannot be reconstructed after the fact.
 
 ## Install and run
 
 ```bash
 pip install -e ".[data,dev]"
-python studies/retail_recipes.py     # the deflation table
-python studies/walk_forward.py       # the out-of-sample test
-pytest                               # 29 tests, no network
+python studies/retail_recipes.py            # long-only deflation table
+python studies/long_short.py                # same grid, beta removed
+python studies/walk_forward.py              # the out-of-sample test
+python studies/polymarket_retrospective.py  # the tool against its author
+pytest                                      # 42 tests, no network
 ```
 
 Prices are cached as CSV under `data/cache/` on first download, so every study
@@ -110,28 +150,28 @@ print(result.render())
 ```
 
 Declare `n_trials` honestly. It is every configuration you tried, including the
-ones you abandoned — that is the whole point, and nothing in the data can
-check it for you.
+ones you abandoned — that is the whole point, and nothing in the data can check
+it for you.
 
-## Two rules enforced in code
+## Three rules enforced in code
 
-Both are easy to get wrong and both manufacture profits out of nothing:
+Each is easy to get wrong and each manufactures profits out of nothing:
 
 1. **Positions are shifted one day forward.** A signal computed from today's
-   close can only be traded tomorrow.
+   close can only be traded tomorrow. There is a test that perturbs the *last*
+   price and asserts no past return moves.
 2. **Turnover is charged**, 5 bps per position change by default.
-
-A configuration that never triggers earns a Sharpe of zero rather than being
-dropped — silently removing it after seeing the out-of-sample half would be
-look-ahead bias through the back door.
+3. **A configuration that never triggers earns a Sharpe of zero** rather than
+   being dropped. Removing it after seeing the out-of-sample half would be
+   look-ahead bias through the back door.
 
 ## Prior art
 
-The corrections themselves are not new, and several implementations exist —
+The corrections are not new, and several implementations exist —
 [pypbo](https://github.com/esvhd/pypbo), vectorbt's `deflated_sharpe_ratio`,
-skfolio. What this repository adds is the study: the same honest trial count
-applied across ten instruments and four decades, the walk-forward test that
-settles it, and the two measured caveats about the metrics above.
+skfolio. What this repository adds is the study: an honest trial count applied
+across ten instruments and four decades, in both long-only and long/short form,
+the walk-forward test that settles it, and the three measured caveats above.
 
 ## License
 

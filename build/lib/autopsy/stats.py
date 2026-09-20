@@ -83,20 +83,12 @@ def probabilistic_sharpe_ratio(
     return float(norm.cdf(z / math.sqrt(variance)))
 
 
-def expected_max_sharpe(n_trials: int, sharpe_variance: float) -> float:
+def expected_max_sharpe(n_trials: int, sharpe_variance: float = 1.0) -> float:
     """Expected maximum per-period Sharpe over n_trials skill-less strategies.
 
     Bailey & Lopez de Prado (2014), eq. 5. This is the bar a backtest must clear
-    to mean anything: with 1000 trials and V[SR] = 1, the winner is expected to
-    show a Sharpe of about 3.26.
-
-    `sharpe_variance` is the variance of the Sharpe ratios ACROSS the trials you
-    ran, in the same units as the Sharpe you are testing. It is deliberately not
-    optional, because the familiar value of 1.0 is only sensible for ANNUALIZED
-    Sharpe ratios. Everything in this module is per-period: on daily data the
-    across-trial variance is typically 1e-4 to 1e-3, so passing 1.0 inflates the
-    bar by a factor of thousands and rejects everything -- silently, and with an
-    air of rigour. Use `sharpe_variance_across_trials` to estimate it.
+    to mean anything: with 1000 independent trials of pure noise, the winner is
+    expected to show a Sharpe of about 3.26.
     """
     if n_trials < 1:
         raise ValueError("n_trials must be >= 1")
@@ -110,24 +102,11 @@ def expected_max_sharpe(n_trials: int, sharpe_variance: float) -> float:
     return float(sd * ((1.0 - EULER_MASCHERONI) * a + EULER_MASCHERONI * b))
 
 
-def sharpe_variance_across_trials(sharpes) -> float:
-    """Sample variance of the per-period Sharpe ratios of every trial you ran.
-
-    This is the input `deflated_sharpe_ratio` needs. Estimating it from the
-    trials themselves is what makes the bar reflect the search you actually
-    performed rather than a textbook constant.
-    """
-    values = np.asarray(list(sharpes), dtype=float)
-    if values.size < 2:
-        raise ValueError("need at least 2 trials to estimate their dispersion")
-    return float(values.var(ddof=1))
-
-
 def deflated_sharpe_ratio(
     observed_sharpe: float,
     n_observations: int,
     n_trials: int,
-    sharpe_variance: float,
+    sharpe_variance: float = 1.0,
     skewness: float = 0.0,
     kurtosis: float = 3.0,
 ) -> tuple[float, float]:

@@ -5,6 +5,7 @@ import pytest
 
 from autopsy.stats import (
     deflated_sharpe_ratio,
+    sharpe_variance_across_trials,
     expected_max_sharpe,
     min_track_record_length,
     moments,
@@ -35,9 +36,14 @@ class TestExpectedMaxSharpe:
 
     def test_rejects_invalid_input(self):
         with pytest.raises(ValueError):
-            expected_max_sharpe(0)
+            expected_max_sharpe(0, 1.0)
         with pytest.raises(ValueError):
             expected_max_sharpe(10, -1.0)
+
+    def test_variance_must_be_supplied(self):
+        """No default: the textbook 1.0 is wrong for per-period Sharpe ratios."""
+        with pytest.raises(TypeError):
+            expected_max_sharpe(100)
 
 
 class TestProbabilisticSharpe:
@@ -69,16 +75,16 @@ class TestDeflatedSharpe:
     def test_never_more_confident_than_psr_against_zero(self):
         """Deflating can only raise the bar, so it can only lower confidence."""
         psr = probabilistic_sharpe_ratio(0.15, 1000)
-        dsr, _ = deflated_sharpe_ratio(0.15, 1000, n_trials=50)
+        dsr, _ = deflated_sharpe_ratio(0.15, 1000, n_trials=50, sharpe_variance=1.0)
         assert dsr <= psr
 
     def test_more_trials_kill_the_same_sharpe(self):
-        honest, _ = deflated_sharpe_ratio(0.12, 1000, n_trials=2)
-        fished, _ = deflated_sharpe_ratio(0.12, 1000, n_trials=5000)
+        honest, _ = deflated_sharpe_ratio(0.12, 1000, n_trials=2, sharpe_variance=1.0)
+        fished, _ = deflated_sharpe_ratio(0.12, 1000, n_trials=5000, sharpe_variance=1.0)
         assert fished < honest
 
     def test_returns_the_bar_it_used(self):
-        dsr, bar = deflated_sharpe_ratio(0.12, 1000, n_trials=100)
+        dsr, bar = deflated_sharpe_ratio(0.12, 1000, n_trials=100, sharpe_variance=1.0)
         assert bar == pytest.approx(expected_max_sharpe(100, 1.0))
 
 
@@ -111,3 +117,35 @@ class TestSampleStatistics:
             sharpe_ratio(np.ones(50))
         with pytest.raises(ValueError):
             sharpe_ratio(np.array([0.01]))
+
+
+class TestSharpeVarianceInput:
+    def test_estimated_from_trials_not_assumed(self):
+        trials = [0.01, 0.02, 0.03, 0.04, 0.05]
+        assert sharpe_variance_across_trials(trials) == pytest.approx(
+            np.var(trials, ddof=1)
+        )
+
+    def test_needs_at_least_two_trials(self):
+        with pytest.raises(ValueError):
+            sharpe_variance_across_trials([0.02])
+
+    def test_the_textbook_default_would_reject_everything(self):
+        """Regression test for a bug this repository shipped and then caught.
+
+        Per-period Sharpe ratios on daily data cluster around 0.03 with an
+        across-trial variance near 3e-4. Using the familiar V[SR] = 1 raises the
+        bar by a factor of thousands, so a genuinely strong result is rejected.
+        """
+        realistic = 3.4e-4
+        strong_sharpe = 0.12
+
+        honest, bar_honest = deflated_sharpe_ratio(
+            strong_sharpe, 8000, n_trials=44, sharpe_variance=realistic
+        )
+        wrong, bar_wrong = deflated_sharpe_ratio(
+            strong_sharpe, 8000, n_trials=44, sharpe_variance=1.0
+        )
+        assert bar_wrong > 20 * bar_honest
+        assert honest > 0.95
+        assert wrong < 0.01

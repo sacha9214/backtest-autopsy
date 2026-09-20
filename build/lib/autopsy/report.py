@@ -20,7 +20,6 @@ from .stats import (
     moments,
     probabilistic_sharpe_ratio,
     sharpe_ratio,
-    sharpe_variance_across_trials,
 )
 
 DSR_THRESHOLD = 0.95
@@ -143,7 +142,7 @@ def audit(
     sr = sharpes[winner]
     n = len(live)
     skew, kurt = moments(live[winner].values)
-    var_sr = sharpe_variance_across_trials(sharpes.values())
+    var_sr = float(np.var(list(sharpes.values()), ddof=1))
 
     dsr, bar = deflated_sharpe_ratio(sr, n, declared, var_sr, skew, kurt)
 
