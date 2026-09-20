@@ -94,46 +94,21 @@ The metric is kept in the API with this warning attached and out of the verdict.
 
 **3. `V[SR] = 1` is a trap, and this repository fell into it.** The familiar
 default comes from the paper, where it suits *annualized* Sharpe ratios. Applied
-to per-period ratios it is catastrophic: a real daily search here produced an
-across-trial variance of **3.4e-4**, so the default is roughly 3000× too large
-and rejects everything — silently, and with an air of rigour. An early version
-of the retrospective below "caught" three out of three false positives that way,
-which proved nothing at all. `sharpe_variance` is now a required argument with
-no default, and `sharpe_variance_across_trials` estimates it from your own
-trials. There is a regression test for it.
-
-## Turning the tool on its author
-
-Before any of this existed I spent three weeks looking for an edge on Polymarket
-sports markets and produced results that looked real and were not.
-`studies/polymarket_retrospective.py` feeds them back through the corrections
-using only what was known at the time. Since the across-trial variance was never
-recorded, it solves for the value at which each verdict would flip instead of
-inventing one:
-
-| Claim | Textbook verdict | DSR | Flips at |
-|---|---|---|---|
-| Price zone 0.50-0.75: +7.61%, t = 2.41 | **significant** (PSR 0.992) | 0.919 rejected | 0.57× reference — *close* |
-| Pair assembly: +3.05% | not significant | 0.818 rejected | never |
-| Ladderbot residual: +6.9% | not significant | 0.247 rejected | never |
-
-The first is the interesting one, in both directions. Every standard test said
-yes — t of 2.41, PSR above 0.99 — and out-of-sample it delivered +0.06% (t =
-0.03) on 1404 fresh observations. What killed it was counting the eight
-strategies tried before it. But the rejection is close to the flip point, so it
-depends on a parameter that was never written down: had the search been less
-dispersed, the correction would have let it through. Counting your trials is not
-optional, and the count cannot be reconstructed after the fact.
+to per-period ratios it is catastrophic: the SPY grid in this repository has an
+across-trial variance of **3.4e-4**, so the default is roughly 3000× too large.
+It rejects everything — silently, and with an air of rigour, which is the worst
+way for a tool like this to be wrong. `sharpe_variance` is now a required
+argument with no default, and `sharpe_variance_across_trials` estimates it from
+your own trials. There is a regression test pinning the behaviour.
 
 ## Install and run
 
 ```bash
 pip install -e ".[data,dev]"
-python studies/retail_recipes.py            # long-only deflation table
-python studies/long_short.py                # same grid, beta removed
-python studies/walk_forward.py              # the out-of-sample test
-python studies/polymarket_retrospective.py  # the tool against its author
-pytest                                      # 42 tests, no network
+python studies/retail_recipes.py   # long-only deflation table
+python studies/long_short.py       # same grid, beta removed
+python studies/walk_forward.py     # the out-of-sample test
+pytest                             # 42 tests, no network
 ```
 
 Prices are cached as CSV under `data/cache/` on first download, so every study
