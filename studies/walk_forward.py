@@ -17,7 +17,9 @@ from autopsy.strategies import run_grid
 
 warnings.filterwarnings("ignore")
 
-TICKERS = ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "GLD", "TLT", "AAPL"]
+from _universe import UNIVERSE
+
+TICKERS = UNIVERSE
 
 
 def realised_sharpe(returns) -> float:

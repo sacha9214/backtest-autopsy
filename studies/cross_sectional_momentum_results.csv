@@ -1,0 +1,2 @@
+trials,winner,sharpe,bar,dsr,survives,benchmark,sharpe_oos,benchmark_oos
+48,"mom(lb=189,skip=0,n=3,lo)",0.758,0.695,0.63,False,0.653,0.825,0.86

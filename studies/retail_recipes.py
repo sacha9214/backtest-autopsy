@@ -14,10 +14,11 @@ import pandas as pd
 from autopsy.data import load_prices
 from autopsy.report import audit
 from autopsy.strategies import run_grid
+from _universe import UNIVERSE, group_of
 
 warnings.filterwarnings("ignore")
 
-TICKERS = ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "GLD", "TLT", "AAPL"]
+TICKERS = UNIVERSE
 
 
 def main() -> None:
@@ -36,6 +37,7 @@ def main() -> None:
         rows.append(
             {
                 "ticker": ticker,
+                "group": group_of(ticker),
                 "years": round(result.n_observations / 252, 1),
                 "winner": result.winner.split("(")[0],
                 "sharpe": round(result.sharpe_annualized, 2),
@@ -49,16 +51,33 @@ def main() -> None:
         )
 
     table = pd.DataFrame(rows)
-    print(table.to_string(index=False))
-    print()
+    n = len(table)
+
+    print("By asset class:")
+    print(f"  {'group':<15} {'n':>3} {'survive':>8} {'beat B&H':>9} {'both':>6} "
+          f"{'med Sharpe':>11} {'med bar':>8}")
+    for group, part in table.groupby("group", sort=False):
+        print(f"  {group:<15} {len(part):>3} "
+              f"{int(part.survives.sum()):>8} {int(part.beats_bh.sum()):>9} "
+              f"{int((part.survives & part.beats_bh).sum()):>6} "
+              f"{part.sharpe.median():>11.2f} {part.bar.median():>8.2f}")
+
     survivors = int(table["survives"].sum())
     beats = int(table["beats_bh"].sum())
     both = int((table["survives"] & table["beats_bh"]).sum())
-    print(f"  Survive deflation           : {survivors}/{len(table)}")
-    print(f"  Beat buy and hold           : {beats}/{len(table)}")
-    print(f"  BOTH (the only ones that count): {both}/{len(table)}")
-    print(f"  Median Sharpe / bar         : {table.sharpe.median():.2f} / {table.bar.median():.2f}")
-    print(f"  Winning family              : {dict(families)}")
+    print()
+    print(f"  Instruments tested             : {n}")
+    print(f"  Survive deflation              : {survivors}/{n} ({survivors/n:.0%})")
+    print(f"  Beat buy and hold              : {beats}/{n} ({beats/n:.0%})")
+    print(f"  BOTH (the only ones that count): {both}/{n} ({both/n:.0%})")
+    print(f"  Median Sharpe / bar            : {table.sharpe.median():.2f} / {table.bar.median():.2f}")
+    print(f"  Winning family                 : {dict(families)}")
+    if both:
+        print()
+        print("  Survivors that also beat buy and hold:")
+        for _, r in table[table.survives & table.beats_bh].iterrows():
+            print(f"    {r.ticker:6} {r.winner:<22} Sharpe {r.sharpe:.2f} "
+                  f"vs B&H {r.buy_hold:.2f}, DSR {r.dsr:.3f}")
     table.to_csv("studies/retail_recipes_results.csv", index=False)
 
 

@@ -15,29 +15,26 @@ them on the strategies people actually repeat.
 
 Forty-four configurations that every trading blog recommends — moving-average
 crossovers, RSI oversold, time-series momentum, Bollinger reversion, Donchian
-breakouts — across ten liquid US instruments, 22 to 46 years of adjusted daily
-data each, with transaction costs and a one-day execution lag. Then the same
-grid again in long/short form, so the results cannot simply be inheriting the
-market's rise.
+breakouts — across **49 instruments** spanning US broad market, sectors,
+international, fixed income, commodities, factor ETFs and large caps, with up to
+64 years of adjusted daily data each. Transaction costs charged, positions
+lagged one day.
 
 | | Long-only | Long/short |
 |---|---|---|
-| Beat buy and hold in-sample | 9 / 10 | 3 / 10 |
-| Survive deflation for 44 trials | **1 / 10** | **0 / 10** |
-| Positive out-of-sample | 9 / 10 | 5 / 10 |
-| Beat buy and hold out-of-sample | **1 / 10** | **1 / 10** |
-| Median out-of-sample Sharpe | — | **−0.01** |
+| Survive deflation for 44 trials | **2 / 49** | **0 / 49** |
+| Beat buy and hold in-sample | 33 / 49 | 16 / 49 |
+| Beat buy and hold *out-of-sample* | **6 / 49** | **4 / 49** |
+| Still the best choice out-of-sample | 2 / 49 | — |
+| Median out-of-sample edge vs buy and hold | **−0.19** | **−0.54** |
 
-The long-only column has an obvious objection: on assets that rose for thirty
-years, "sometimes long" is nearly "always long". The long/short column removes
-that objection and the answer gets worse, not better. Stripped of the market's
-beta, these recipes produce a median out-of-sample Sharpe of **−0.01**.
-
-The single out-of-sample winner in both studies is TLT — long-dated Treasuries,
-the only instrument in the set that did not rise over the test window (its own
-Sharpe was 0.06). On a flat asset, being occasionally out of the market helps.
-Its DSR is 0.556, so it does not clear the bar either: it beats a weak
-benchmark, not chance.
+Two survivors out of 49 is what a 95% threshold produces by chance: 49 × 0.05 =
+2.45 expected false positives. The observed count is indistinguishable from
+there being nothing at all. Splitting history into four eras and deflating each
+separately gives the same answer from the other direction — **2 survivors out of
+108 instrument-eras, against 5.4 expected by chance.** Fewer discoveries than
+noise alone would generate. (These tests are not independent, since the
+instruments are correlated, so treat both expectations as approximate.)
 
 ```
   SPY 1993-2026, 44 retail recipes
@@ -52,8 +49,63 @@ benchmark, not chance.
   VERDICT: not distinguishable from the best of 44 coin flips.
 ```
 
-Thirty-three years of data is not enough to tell this strategy apart from luck.
-It would take 121.
+### But the recipes are not pure noise
+
+Against a control group of coin-flip rules trading at the same frequency, given
+the same search effort, the real grid wins on **45 of 49 instruments**, by a
+median of **+0.18 Sharpe**. Momentum, reversion and breakout logic do capture
+something real.
+
+That something is simply too small to survive the cost of having searched for
+it, and too small to beat holding the asset. Both statements are true at once,
+and the second is the one that matters for anyone deciding what to do with
+money. *(Caveat: trend-following rules are long when markets rise, so part of
+that +0.18 is timing the market's own drift rather than skill.)*
+
+### What searching is worth, measured
+
+Scrambling SPY's daily returns destroys every pattern, so nothing is findable by
+construction. Searching 43 configurations on that scrambled series still
+produces a Sharpe of **0.64**. On the real series the best is 0.80.
+
+The gap — **0.16 Sharpe** — is everything the signal was actually worth. The
+rest was the price of looking. The measured gain tracks the theoretical bar to
+within 0.10 Sharpe, with the formula running slightly high: grid configurations
+are correlated (mean pairwise 0.35), so 44 nominal trials are fewer than 44
+independent ones, and declaring the raw count is conservative.
+
+### Costs are not the culprit
+
+Sweeping transaction costs from 0 to 50 bps degrades the median best Sharpe from
+0.63 to 0.49, and 19 of 49 instruments still beat buy and hold at 50 bps. The
+decay is gradual. Whatever kills these strategies, it is not fees — it is
+selection.
+
+### The published anomaly fares no better here
+
+Cross-sectional momentum — the anomaly with the strongest survival record in the
+literature — ranked across the same 49 instruments, 48 configurations, judged by
+the same standard: Sharpe 0.76 against a bar of 0.69, **DSR 0.630, rejected**,
+and out-of-sample it returns 0.83 against 0.86 for an equal-weight basket.
+MinTRL: 683 years.
+
+This does **not** refute the published anomaly. Jegadeesh & Titman rank hundreds
+of individual stocks; 49 mostly-diversified ETFs are a different and much
+smaller cross-section. It says the effect does not survive *in this universe at
+this trial count*, and nothing more.
+
+## The studies
+
+| Script | Question |
+|---|---|
+| `retail_recipes.py` | Do the recipes survive deflation? (49 instruments, by asset class) |
+| `long_short.py` | Same, with the market's beta removed |
+| `walk_forward.py` | Does the choice you made actually pay, on data it never saw? |
+| `price_of_searching.py` | What does searching buy on data with nothing to find? |
+| `random_rules.py` | Do reasoned rules beat coin-flip rules at equal search effort? |
+| `cost_sensitivity.py` | At what trading cost does it collapse? |
+| `by_era.py` | Did they ever work, in any era? |
+| `cross_sectional_momentum.py` | Does the strongest published anomaly clear the same bar? |
 
 ## What it computes
 
@@ -105,11 +157,14 @@ your own trials. There is a regression test pinning the behaviour.
 
 ```bash
 pip install -e ".[data,dev]"
-python studies/retail_recipes.py   # long-only deflation table
-python studies/long_short.py       # same grid, beta removed
-python studies/walk_forward.py     # the out-of-sample test
-pytest                             # 42 tests, no network
+python studies/retail_recipes.py             # start here: the deflation table
+python studies/price_of_searching.py         # what searching is worth
+python studies/random_rules.py               # vs coin-flip rules
+pytest                                       # 42 tests, no network
 ```
+
+The first run downloads 49 instruments, which takes a few minutes. Every run
+afterwards reads the cache.
 
 The first study you run downloads its prices from Yahoo Finance and caches them
 as CSV under `data/cache/`; every run after that is offline. The cache is not
