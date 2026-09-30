@@ -1,5 +1,7 @@
 # backtest-autopsy
 
+[![tests](https://github.com/sacha9214/backtest-autopsy/actions/workflows/tests.yml/badge.svg)](https://github.com/sacha9214/backtest-autopsy/actions/workflows/tests.yml)
+
 **Was that Sharpe ratio skill, or the best of N coin flips?**
 
 Test fifty variants of a strategy, keep the best one, and the number you are
